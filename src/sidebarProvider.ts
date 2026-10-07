@@ -35,7 +35,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   public refresh(): void {
     if (!this._view) { return; }
     const highlights = loadHighlights(this._context);
-    this._view.webview.postMessage({ type: "update", highlights });
+    this._view.webview.postMessage({
+      type: "update",
+      highlights,
+      backgroundsState: highlights.length === 0 || highlights.every((h) => h.backgroundVisible !== false)
+        ? "on"
+        : highlights.every((h) => h.backgroundVisible === false)
+          ? "off"
+          : "mixed",
+      defaultOpacity: vscode.workspace
+        .getConfiguration("codemark")
+        .get<number>("highlightOpacity", 0.28),
+    });
   }
 
   public reveal(): void {
@@ -44,7 +55,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private _setMessageListener(webview: vscode.Webview): void {
     webview.onDidReceiveMessage(
-      async (msg: { command: string; id?: string; filePath?: string; snippet?: string; hash?: string }) => {
+      async (msg: { command: string; id?: string; filePath?: string; snippet?: string; hash?: string; backgroundVisible?: string; opacity?: string }) => {
         switch (msg.command) {
           case "jumpTo":
             this._onAction("jumpTo", {
@@ -65,6 +76,25 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             break;
           case "changeColor":
             this._onAction("changeColor", { id: msg.id });
+            break;
+          case "toggleBackground":
+            this._onAction("toggleBackground", {});
+            break;
+          case "setBackgroundVisible":
+            if (msg.id && msg.backgroundVisible !== undefined) {
+              this._onAction("setBackgroundVisible", {
+                id: msg.id,
+                backgroundVisible: msg.backgroundVisible,
+              });
+            }
+            break;
+          case "setOpacity":
+            if (msg.id && msg.opacity !== undefined) {
+              this._onAction("setOpacity", {
+                id: msg.id,
+                opacity: msg.opacity,
+              });
+            }
             break;
           case "ready":
             this.refresh();
@@ -139,6 +169,21 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       background: var(--dm-input-bg);
       border-radius: 10px;
       padding: 2px 7px;
+    }
+    .header-toggle {
+      flex-shrink: 0;
+      padding: 3px 6px;
+      border: 1px solid var(--dm-border);
+      border-radius: 4px;
+      background: transparent;
+      color: var(--dm-fg);
+      font: inherit;
+      font-size: 10px;
+      cursor: pointer;
+    }
+    .header-toggle:hover, .header-toggle:focus-visible {
+      border-color: var(--dm-accent);
+      outline: none;
     }
 
     /* ── Filter Bar ── */
@@ -263,17 +308,16 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     .card-actions {
       display: flex;
-      gap: 4px;
+      flex-wrap: wrap;
+      gap: 6px;
       margin-top: 2px;
-      opacity: 0;
-      transition: opacity 0.15s;
     }
-    .card:hover .card-actions { opacity: 1; }
 
     .btn {
-      font-size: 10px;
+      min-height: 30px;
+      font-size: 12px;
       font-family: var(--dm-font);
-      padding: 2px 7px;
+      padding: 4px 9px;
       border-radius: 4px;
       border: 1px solid var(--dm-border);
       background: var(--dm-hover);
@@ -284,6 +328,36 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     .btn:hover { background: var(--dm-accent); color: var(--dm-btn-fg); border-color: var(--dm-accent); }
     .btn-danger:hover { background: var(--dm-danger); color: #fff; border-color: var(--dm-danger); }
     .btn-jump { font-weight: 600; }
+    .btn-delete { min-width: 32px; font-size: 15px; }
+
+    .card-display-controls {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      padding-top: 2px;
+    }
+    .card-background-toggle {
+      align-self: flex-start;
+    }
+    .opacity-control {
+      display: grid;
+      grid-template-columns: auto minmax(40px, 1fr) 34px;
+      align-items: center;
+      gap: 7px;
+      color: var(--dm-muted);
+      font-size: 11px;
+    }
+    .opacity-control input {
+      width: 100%;
+      min-width: 0;
+      accent-color: var(--dm-accent);
+      cursor: pointer;
+    }
+    .opacity-value {
+      color: var(--dm-fg);
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
 
     /* ── Empty State ── */
     .empty {
@@ -319,6 +393,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
   <div class="header">
     <span class="header-logo">🔖</span>
     <span class="header-title">Code Mark</span>
+    <button class="header-toggle" id="background-toggle" type="button" aria-pressed="true" title="Hide highlight backgrounds">BG On</button>
     <span class="header-count" id="count">0</span>
   </div>
 
@@ -351,6 +426,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     let allHighlights = [];
     let searchQuery = '';
     let filterTag = '';
+    let defaultOpacity = 0.28;
 
     const listEl = document.getElementById('list');
     const countEl = document.getElementById('count');
@@ -359,6 +435,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const statFiles = document.getElementById('stat-files');
     const filterTagEl = document.getElementById('filter-tag');
     const searchEl = document.getElementById('search');
+    const backgroundToggleEl = document.getElementById('background-toggle');
 
     // Notify extension we're ready
     vscode.postMessage({ command: 'ready' });
@@ -368,10 +445,24 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       const msg = event.data;
       if (msg.type === 'update') {
         allHighlights = msg.highlights || [];
+        defaultOpacity = msg.defaultOpacity ?? defaultOpacity;
+        updateBackgroundToggle(msg.backgroundsState);
         rebuildTagFilter();
         render();
       }
     });
+
+    backgroundToggleEl.addEventListener('click', () => {
+      vscode.postMessage({ command: 'toggleBackground' });
+    });
+
+    function updateBackgroundToggle(state) {
+      backgroundToggleEl.textContent = state === 'mixed' ? 'BG Mixed' : state === 'on' ? 'BG On' : 'BG Off';
+      backgroundToggleEl.title = state === 'on'
+        ? 'Hide all highlight backgrounds'
+        : 'Show all highlight backgrounds';
+      backgroundToggleEl.setAttribute('aria-pressed', String(state === 'on'));
+    }
 
     // Search / filter
     searchEl.addEventListener('input', (e) => {
@@ -443,7 +534,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
         if (!h) return;
 
         card.addEventListener('click', (e) => {
-          if (e.target.closest('.card-actions')) return;
+          if (e.target.closest('.card-actions, .card-display-controls')) return;
           vscode.postMessage({ command: 'jumpTo', filePath: h.filePath, snippet: h.codeSnippet, hash: h.codeHash });
         });
 
@@ -463,6 +554,27 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           e.stopPropagation();
           vscode.postMessage({ command: 'delete', id: h.id });
         });
+        card.querySelector('.card-background-toggle')?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({
+            command: 'setBackgroundVisible',
+            id: h.id,
+            backgroundVisible: String(h.backgroundVisible === false),
+          });
+        });
+        const opacitySlider = card.querySelector('.opacity-slider');
+        const opacityValue = card.querySelector('.opacity-value');
+        opacitySlider?.addEventListener('input', (e) => {
+          opacityValue.textContent = e.target.value + '%';
+        });
+        opacitySlider?.addEventListener('change', (e) => {
+          e.stopPropagation();
+          vscode.postMessage({
+            command: 'setOpacity',
+            id: h.id,
+            opacity: String(Number(e.target.value) / 100),
+          });
+        });
       });
     }
 
@@ -471,6 +583,8 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       const fileName = h.filePath.split(/[/\\\\]/).pop() || h.filePath;
       const tagColor = h.color;
       const tagBg = hexToRgba(h.color, 0.18);
+      const opacity = Math.round((h.opacity ?? defaultOpacity) * 100);
+      const backgroundVisible = h.backgroundVisible !== false;
 
       return \`<div class="card" data-id="\${esc(h.id)}" style="border-left-color:\${esc(h.color)}">
         <div class="card-top">
@@ -479,10 +593,18 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
           <span class="card-file" title="\${esc(h.filePath)}">\${esc(fileName)}</span>
         </div>
         <div class="card-snippet">\${esc(snippet)}</div>
+        <div class="card-display-controls">
+          <label class="opacity-control">
+            <span>Opacity</span>
+            <input class="opacity-slider" type="range" min="0" max="100" step="1" value="\${opacity}" aria-label="Highlight opacity">
+            <span class="opacity-value">\${opacity}%</span>
+          </label>
+        </div>
         <div class="card-actions">
           <button class="btn btn-jump">↗ Jump</button>
           <button class="btn btn-tag">🏷 Tag</button>
           <button class="btn btn-color">🎨 Color</button>
+          <button class="btn card-background-toggle" type="button" aria-pressed="\${backgroundVisible}" title="Toggle this highlight's background">BG \${backgroundVisible ? 'On' : 'Off'}</button>
           <button class="btn btn-danger btn-delete">🗑</button>
         </div>
       </div>\`;

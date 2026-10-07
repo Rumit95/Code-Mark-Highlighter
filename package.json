@@ -2,7 +2,7 @@
   "name": "code-mark-highlighter",
   "displayName": "Code Mark Highlighter",
   "description": "Highlight code blocks with custom colors and tags. Highlights persist based on code content — not line numbers — and survive edits and restarts.",
-  "version": "0.1.1",
+  "version": "1.0.0",
   "publisher": "KSHYKR",
   "license": "MIT",
   "repository": {
@@ -52,6 +52,11 @@
         "category": "Code Mark"
       },
       {
+        "command": "codemark.toggleHighlightBackground",
+        "title": "Code Mark: Toggle Highlight Backgrounds",
+        "category": "Code Mark"
+      },
+      {
         "command": "codemark.showPanel",
         "title": "Code Mark: Show Highlights Panel",
         "category": "Code Mark"
@@ -93,6 +98,11 @@
           "command": "codemark.changeColor",
           "when": "editorTextFocus",
           "group": "codemark@4"
+        },
+        {
+          "command": "codemark.toggleHighlightBackground",
+          "when": "editorTextFocus",
+          "group": "codemark@5"
         }
       ]
     },
@@ -140,6 +150,12 @@
         "key": "ctrl+alt+r",
         "mac": "cmd+alt+r",
         "when": "editorTextFocus"
+      },
+      {
+        "command": "codemark.toggleHighlightBackground",
+        "key": "ctrl+alt+b",
+        "mac": "cmd+alt+b",
+        "when": "editorTextFocus"
       }
     ],
     "configuration": {
@@ -156,6 +172,13 @@
           "minimum": 0.5,
           "maximum": 1.0,
           "description": "Minimum similarity ratio (0.5–1.0) for fuzzy content matching when re-applying highlights."
+        },
+        "codemark.highlightOpacity": {
+          "type": "number",
+          "default": 0.28,
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Opacity of highlight backgrounds (0 is transparent, 1 is opaque). Also applies to alpha in #RRGGBBAA colors."
         }
       }
     }
