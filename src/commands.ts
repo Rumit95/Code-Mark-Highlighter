@@ -60,10 +60,12 @@ async function pickColor(currentColor?: string): Promise<string | undefined> {
 
   if (picked.hex === "__custom__") {
     const custom = await vscode.window.showInputBox({
-      prompt: "Enter a hex color (e.g. #FF6B6B)",
+      prompt: "Enter a hex color (e.g. #FF6B6B or #FF6B6B80)",
       value: currentColor ?? "#FFD700",
       validateInput: (v) =>
-        /^#[0-9A-Fa-f]{6}$/.test(v) ? undefined : "Must be a valid hex color like #FF6B6B",
+        /^#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?$/.test(v)
+          ? undefined
+          : "Use #RRGGBB or #RRGGBBAA, such as #FF6B6B80",
     });
     return custom;
   }
@@ -73,28 +75,27 @@ async function pickColor(currentColor?: string): Promise<string | undefined> {
 
 /** Prompt user to choose or enter a tag */
 async function pickTag(currentTag?: string): Promise<string | undefined> {
-  const items = DEFAULT_TAGS.map((t) => ({
-    label: t,
-    picked: t === currentTag,
-  }));
+  return new Promise((resolve) => {
+    const quickPick = vscode.window.createQuickPick<
+      vscode.QuickPickItem & { tag: string }
+    >();
+    const tags = [...new Set([...DEFAULT_TAGS, ...(currentTag ? [currentTag] : [])])];
 
-  const result = await vscode.window.showQuickPick(
-    [{ label: currentTag ?? "", picked: true }, ...items, { label: "➕ Custom tag…", picked: false }],
-    {
-      placeHolder: "Choose a tag (or press Escape to skip)",
-      title: "Code Mark — Set Tag",
-    }
-  );
-
-  if (!result) { return currentTag ?? ""; }
-  if (result.label === "➕ Custom tag…") {
-    const custom = await vscode.window.showInputBox({
-      prompt: "Enter a custom tag",
-      value: currentTag ?? "",
+    quickPick.items = tags.map((tag) => ({ label: tag, tag }));
+    quickPick.value = currentTag ?? "";
+    quickPick.placeholder = "Choose a suggested tag or type a note and press Enter";
+    quickPick.title = "Code Mark — Set Tag or Note";
+    quickPick.onDidAccept(() => {
+      const selectedTag = quickPick.selectedItems[0]?.tag;
+      resolve((selectedTag ?? quickPick.value).trim());
+      quickPick.hide();
     });
-    return custom ?? currentTag ?? "";
-  }
-  return result.label;
+    quickPick.onDidHide(() => {
+      quickPick.dispose();
+      resolve(undefined);
+    });
+    quickPick.show();
+  });
 }
 
 // ─── Command: Highlight Code ──────────────────────────────────────────────────

@@ -3,8 +3,16 @@
 
 import * as vscode from "vscode";
 import { SidebarProvider } from "./sidebarProvider";
-import { applyHighlightsToEditor, disposeAllDecorations } from "./decorationManager";
-import { getHighlightsForFile, loadHighlights } from "./storage";
+import {
+  applyHighlightsToEditor,
+  disposeAllDecorations,
+} from "./decorationManager";
+import {
+  getHighlightsForFile,
+  loadHighlights,
+  setHighlightsBackgroundVisibility,
+  updateHighlight,
+} from "./storage";
 import {
   highlightCode,
   removeHighlightCmd,
@@ -38,6 +46,9 @@ export function activate(context: vscode.ExtensionContext): void {
     async (action: string, data: unknown) => {
       const d = data as Record<string, string>;
       switch (action) {
+        case "toggleBackground":
+          await vscode.commands.executeCommand("codemark.toggleHighlightBackground");
+          break;
         case "jumpTo":
           await jumpToHighlight(
             d.filePath,
@@ -52,13 +63,31 @@ export function activate(context: vscode.ExtensionContext): void {
         case "changeColor":
           await changeColorCmd(context, sidebar, d.id);
           break;
+        case "setBackgroundVisible": {
+          const highlight = loadHighlights(context).find((item) => item.id === d.id);
+          if (!highlight) { break; }
+          updateHighlight(context, highlight.id, {
+            backgroundVisible: d.backgroundVisible === "true",
+          });
+          refreshHighlightDisplay(context, highlight.filePath);
+          break;
+        }
+        case "setOpacity": {
+          const highlight = loadHighlights(context).find((item) => item.id === d.id);
+          const opacity = Number(d.opacity);
+          if (!highlight || !Number.isFinite(opacity)) { break; }
+          updateHighlight(context, highlight.id, {
+            opacity: Math.max(0, Math.min(1, opacity)),
+          });
+          refreshHighlightDisplay(context, highlight.filePath);
+          break;
+        }
         case "refresh":
           refreshActiveEditor(context);
           break;
       }
     }
   );
-
   context.subscriptions.push(
     vscode.window.registerWebviewViewProvider(
       SidebarProvider.VIEW_ID,
@@ -84,6 +113,23 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand("codemark.changeColor", () =>
       changeColorCmd(context, sidebar)
     ),
+
+    vscode.commands.registerCommand("codemark.toggleHighlightBackground", async () => {
+      const highlights = loadHighlights(context);
+      const allVisible = highlights.length === 0 || highlights.every(
+        (highlight) => highlight.backgroundVisible !== false
+      );
+      const visible = !allVisible;
+      setHighlightsBackgroundVisibility(context, visible);
+      for (const editor of vscode.window.visibleTextEditors) {
+        applyForEditor(editor, context);
+      }
+      sidebar.refresh();
+      vscode.window.setStatusBarMessage(
+        `Code Mark: Highlight backgrounds ${visible ? "shown" : "hidden"}.`,
+        2500
+      );
+    }),
 
     vscode.commands.registerCommand("codemark.showPanel", () => {
       sidebar.reveal();
@@ -155,6 +201,16 @@ export function activate(context: vscode.ExtensionContext): void {
     })
   );
 
+  context.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration((event) => {
+      if (!event.affectsConfiguration("codemark.highlightOpacity")) { return; }
+      disposeAllDecorations();
+      for (const editor of vscode.window.visibleTextEditors) {
+        applyForEditor(editor, context);
+      }
+    })
+  );
+
   // Apply highlights to all currently visible editors on startup
   for (const editor of vscode.window.visibleTextEditors) {
     applyForEditor(editor, context);
@@ -177,6 +233,18 @@ function refreshActiveEditor(context: vscode.ExtensionContext): void {
   if (editor) {
     applyForEditor(editor, context);
   }
+}
+
+function refreshHighlightDisplay(
+  context: vscode.ExtensionContext,
+  filePath: string
+): void {
+  for (const editor of vscode.window.visibleTextEditors) {
+    if (getWorkspaceRelativePath(editor.document.uri) === filePath) {
+      applyForEditor(editor, context);
+    }
+  }
+  sidebar.refresh();
 }
 
 export function deactivate(): void {

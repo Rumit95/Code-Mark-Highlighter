@@ -5,7 +5,7 @@ import * as vscode from "vscode";
 import { Highlight } from "./types";
 import { findRangeInDocument } from "./highlightMatcher";
 
-// Cache of decoration types keyed by hex color
+// Cache of decoration types keyed by color, opacity, and background visibility.
 const decorationTypeCache = new Map<string, vscode.TextEditorDecorationType>();
 
 /**
@@ -13,32 +13,41 @@ const decorationTypeCache = new Map<string, vscode.TextEditorDecorationType>();
  * Decoration types are expensive — we reuse them.
  */
 export function getOrCreateDecorationType(
-  color: string
+  color: string,
+  opacity: number,
+  backgroundVisible: boolean
 ): vscode.TextEditorDecorationType {
-  const cached = decorationTypeCache.get(color);
+  const cacheKey = `${color}:${opacity}:${backgroundVisible}`;
+  const cached = decorationTypeCache.get(cacheKey);
   if (cached) { return cached; }
 
-  // Parse color to create semi-transparent background + ruler marker
+  const backgroundColor = backgroundVisible
+    ? hexToRgba(color, opacity)
+    : "transparent";
+  const border = backgroundVisible
+    ? `1px solid ${hexToRgba(color, opacity)}`
+    : "none";
+
   const decorationType = vscode.window.createTextEditorDecorationType({
-    backgroundColor: hexToRgba(color, 0.28),
-    border: `1px solid ${hexToRgba(color, 0.7)}`,
+    backgroundColor,
+    border,
     borderRadius: "2px",
-    overviewRulerColor: color,
+    overviewRulerColor: hexToRgba(color, 1),
     overviewRulerLane: vscode.OverviewRulerLane.Right,
     // Subtle gutter indicator
     gutterIconPath: undefined,
     // Light theme gets a slightly darker tint
     light: {
-      backgroundColor: hexToRgba(color, 0.22),
-      border: `1px solid ${hexToRgba(color, 0.6)}`,
+      backgroundColor,
+      border,
     },
     dark: {
-      backgroundColor: hexToRgba(color, 0.30),
-      border: `1px solid ${hexToRgba(color, 0.8)}`,
+      backgroundColor,
+      border,
     },
   });
 
-  decorationTypeCache.set(color, decorationType);
+  decorationTypeCache.set(cacheKey, decorationType);
   return decorationType;
 }
 
@@ -59,7 +68,15 @@ export function applyHighlightsToEditor(
   if (highlights.length === 0) { return; }
 
   // Group by color
-  const byColor = new Map<string, vscode.DecorationOptions[]>();
+  const byStyle = new Map<string, {
+    color: string;
+    opacity: number;
+    backgroundVisible: boolean;
+    decorations: vscode.DecorationOptions[];
+  }>();
+  const defaultOpacity = vscode.workspace
+    .getConfiguration("codemark")
+    .get<number>("highlightOpacity", 0.28);
 
   for (const h of highlights) {
     const range = findRangeInDocument(
@@ -70,8 +87,16 @@ export function applyHighlightsToEditor(
     );
     if (!range) { continue; }
 
-    if (!byColor.has(h.color)) {
-      byColor.set(h.color, []);
+    const opacity = h.opacity ?? defaultOpacity;
+    const backgroundVisible = h.backgroundVisible !== false;
+    const styleKey = `${h.color}:${opacity}:${backgroundVisible}`;
+    if (!byStyle.has(styleKey)) {
+      byStyle.set(styleKey, {
+        color: h.color,
+        opacity,
+        backgroundVisible,
+        decorations: [],
+      });
     }
 
     const hoverMsg = new vscode.MarkdownString(
@@ -80,16 +105,20 @@ export function applyHighlightsToEditor(
     );
     hoverMsg.isTrusted = true;
 
-    byColor.get(h.color)!.push({
+    byStyle.get(styleKey)!.decorations.push({
       range,
       hoverMessage: hoverMsg,
     });
   }
 
   // Apply decorations per color group
-  for (const [color, decorations] of byColor) {
-    const decType = getOrCreateDecorationType(color);
-    editor.setDecorations(decType, decorations);
+  for (const style of byStyle.values()) {
+    const decType = getOrCreateDecorationType(
+      style.color,
+      style.opacity,
+      style.backgroundVisible
+    );
+    editor.setDecorations(decType, style.decorations);
   }
 }
 
@@ -144,5 +173,8 @@ function hexToRgba(hex: string, alpha: number): string {
   const r = parseInt(clean.substring(0, 2), 16);
   const g = parseInt(clean.substring(2, 4), 16);
   const b = parseInt(clean.substring(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const colorAlpha = clean.length === 8
+    ? parseInt(clean.substring(6, 8), 16) / 255
+    : 1;
+  return `rgba(${r}, ${g}, ${b}, ${alpha * colorAlpha})`;
 }

@@ -100,6 +100,18 @@ export function updateHighlight(
   }
 }
 
+export function setHighlightsBackgroundVisibility(
+  context: vscode.ExtensionContext,
+  visible: boolean
+): void {
+  const all = loadHighlights(context).map((highlight) => ({
+    ...highlight,
+    backgroundVisible: visible,
+    updatedAt: new Date().toISOString(),
+  }));
+  saveHighlights(context, all);
+}
+
 export function removeHighlightsForFile(
   context: vscode.ExtensionContext,
   filePath: string

@@ -14,6 +14,10 @@ export interface Highlight {
   tag: string;
   /** Hex color string e.g. "#FFD700" */
   color: string;
+  /** Per-highlight background opacity from 0 (transparent) to 1 (opaque). */
+  opacity?: number;
+  /** Whether this highlight's editor background is visible. Defaults to true. */
+  backgroundVisible?: boolean;
   /** ISO 8601 timestamp */
   createdAt: string;
   /** ISO 8601 timestamp */
