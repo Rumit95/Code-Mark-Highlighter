@@ -1,6 +1,6 @@
 # Code Mark Highlighter
 
-> Highlight code blocks with custom colors and tags. Highlights track **code content**, not line numbers — they survive edits, restarts, and file reorganizations.
+> Code Mark Highlighter helps developers mark important code with color, labels, and quick navigation inside VS Code. Highlights are stored by code content rather than line numbers, so they remain stable even after edits, rearrangement, or reopening files. Use the sidebar to filter, jump, edit tags, change colors, adjust opacity, and toggle highlight backgrounds.
 
 ---
 
