@@ -2,7 +2,7 @@
   "name": "code-mark-highlighter",
   "displayName": "Code Mark Highlighter",
   "description": "Highlight code blocks with custom colors and tags. Highlights persist based on code content — not line numbers — and survive edits and restarts.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "publisher": "KSHYKR",
   "license": "MIT",
   "repository": {
@@ -74,6 +74,11 @@
       {
         "command": "codemark.clearAllHighlights",
         "title": "Code Mark: Clear All Highlights in File",
+        "category": "Code Mark"
+      },
+      {
+        "command": "codemark.openSidebarSettings",
+        "title": "Code Mark: Open Settings",
         "category": "Code Mark"
       }
     ],
@@ -179,6 +184,11 @@
           "minimum": 0,
           "maximum": 1,
           "description": "Opacity of highlight backgrounds (0 is transparent, 1 is opaque). Also applies to alpha in #RRGGBBAA colors."
+        },
+        "codemark.duplicateHighlightWarning": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show a non-blocking warning when the selected code appears to already be highlighted in this file."
         }
       }
     }

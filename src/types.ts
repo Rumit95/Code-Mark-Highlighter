@@ -10,6 +10,9 @@ export interface Highlight {
   codeSnippet: string;
   /** SHA-256 hash of codeSnippet for fast exact matching */
   codeHash: string;
+  /** Nearby source text used to distinguish identical snippets. */
+  contextBefore?: string;
+  contextAfter?: string;
   /** User-assigned tag e.g. "TODO", "Bug", "Important" */
   tag: string;
   /** Hex color string e.g. "#FFD700" */

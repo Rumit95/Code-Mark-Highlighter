@@ -83,7 +83,9 @@ export function applyHighlightsToEditor(
       editor.document,
       h.codeSnippet,
       h.codeHash,
-      fuzzyThreshold
+      fuzzyThreshold,
+      h.contextBefore,
+      h.contextAfter
     );
     if (!range) { continue; }
 
@@ -157,7 +159,9 @@ export function findHighlightAtCursor(
       editor.document,
       h.codeSnippet,
       h.codeHash,
-      fuzzyThreshold
+      fuzzyThreshold,
+      h.contextBefore,
+      h.contextAfter
     );
     if (range && range.contains(cursorPos)) {
       return h;

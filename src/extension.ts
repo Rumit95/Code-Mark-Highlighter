@@ -22,6 +22,31 @@ import {
 } from "./commands";
 import { nextHighlight, prevHighlight, jumpToHighlight } from "./highlightNavigator";
 
+async function openCodeMarkSettingsMenu(): Promise<void> {
+  const action = await vscode.window.showQuickPick([
+    "Adjust fuzzy match threshold",
+    "Open keyboard shortcuts",
+    "Cancel",
+  ], {
+    placeHolder: "Code Mark settings",
+    title: "Code Mark — Settings",
+  });
+
+  if (!action || action === "Cancel") { return; }
+
+  if (action === "Adjust fuzzy match threshold") {
+    await vscode.commands.executeCommand(
+      "workbench.action.openSettings",
+      "@ext:KSHYKR.code-mark-highlighter codemark.fuzzyMatchThreshold"
+    );
+    return;
+  }
+
+  if (action === "Open keyboard shortcuts") {
+    await vscode.commands.executeCommand("workbench.action.openGlobalKeybindings");
+  }
+}
+
 let sidebar: SidebarProvider;
 
 function getWorkspaceRelativePath(uri: vscode.Uri): string {
@@ -54,7 +79,9 @@ export function activate(context: vscode.ExtensionContext): void {
             d.filePath,
             d.snippet,
             d.hash,
-            getFuzzyThreshold()
+            getFuzzyThreshold(),
+            d.contextBefore,
+            d.contextAfter
           );
           break;
         case "editTag":
@@ -146,6 +173,10 @@ export function activate(context: vscode.ExtensionContext): void {
 
     vscode.commands.registerCommand("codemark.clearAllHighlights", () =>
       clearAllHighlightsCmd(context, sidebar)
+    ),
+
+    vscode.commands.registerCommand("codemark.openSidebarSettings", () =>
+      openCodeMarkSettingsMenu()
     )
   );
 

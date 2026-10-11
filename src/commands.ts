@@ -31,6 +31,39 @@ function getWorkspaceRelativePath(uri: vscode.Uri): string {
   return uri.fsPath;
 }
 
+function isDuplicateSelection(
+  context: vscode.ExtensionContext,
+  filePath: string,
+  snippet: string
+): boolean {
+  const trimmedSnippet = snippet.trim();
+  const all = getHighlightsForFile(context, filePath);
+  const normalizedSnippet = trimmedSnippet.replace(/\s+/g, " ");
+
+  return all.some((highlight) => {
+    if (!highlight || !highlight.codeSnippet) { return false; }
+    const existingSnippet = highlight.codeSnippet.trim();
+    const normalizedExisting = existingSnippet.replace(/\s+/g, " ");
+    return (
+      highlight.codeHash === hashText(trimmedSnippet) &&
+      (highlight.codeSnippet === trimmedSnippet ||
+        normalizedExisting === normalizedSnippet)
+    ) ||
+      (highlight.codeSnippet === trimmedSnippet &&
+        highlight.filePath === filePath);
+  });
+}
+
+function showDuplicateHighlightNotice(snippet: string): void {
+  const preview = snippet.trim().slice(0, 28).replace(/\s+/g, " ");
+  const suffix = snippet.trim().length > 28 ? "…" : "";
+  const label = `${preview}${suffix}` || "selection";
+  vscode.window.showWarningMessage(
+    `Code Mark: Duplicate highlight detected for "${label}". The highlight was still added, but you may want to keep only one copy.`,
+    { modal: false }
+  );
+}
+
 /** Generate a UUID v4 */
 function uuidv4(): string {
   return crypto.randomUUID();
@@ -122,6 +155,21 @@ export async function highlightCode(
     return;
   }
 
+  const documentText = editor.document.getText();
+  const selectionStart = editor.document.offsetAt(selection.start);
+  const selectionEnd = editor.document.offsetAt(selection.end);
+  const contextBefore = documentText.slice(Math.max(0, selectionStart - 120), selectionStart);
+  const contextAfter = documentText.slice(selectionEnd, selectionEnd + 120);
+
+  const filePath = getWorkspaceRelativePath(editor.document.uri);
+  const duplicateWarningEnabled = vscode.workspace
+    .getConfiguration("codemark")
+    .get<boolean>("duplicateHighlightWarning", true);
+
+  if (duplicateWarningEnabled && isDuplicateSelection(context, filePath, snippet)) {
+    showDuplicateHighlightNotice(snippet);
+  }
+
   // Pick color
   const color = await pickColor();
   if (!color) { return; }
@@ -135,6 +183,8 @@ export async function highlightCode(
     filePath: getWorkspaceRelativePath(editor.document.uri),
     codeSnippet: snippet,
     codeHash: hashText(snippet),
+    contextBefore,
+    contextAfter,
     tag: tag || "",
     color,
     createdAt: now,
@@ -165,7 +215,9 @@ export async function removeHighlightCmd(
   const target = findHighlightAtCursor(editor, fileHighlights, getFuzzyThreshold());
 
   if (!target) {
-    vscode.window.showInformationMessage("Code Mark: No highlight found at cursor.");
+    vscode.window.showInformationMessage(
+      "Code Mark: No highlight was found at the cursor. Move onto a highlighted section or use the sidebar to choose a match."
+    );
     return;
   }
 
@@ -205,7 +257,9 @@ export async function editTagCmd(
   }
 
   if (!target) {
-    vscode.window.showInformationMessage("Code Mark: No highlight found at cursor.");
+    vscode.window.showInformationMessage(
+      "Code Mark: No highlight was found at the cursor. Move onto a highlighted section or use the sidebar to choose a match."
+    );
     return;
   }
 
@@ -241,7 +295,9 @@ export async function changeColorCmd(
   }
 
   if (!target) {
-    vscode.window.showInformationMessage("Code Mark: No highlight found at cursor.");
+    vscode.window.showInformationMessage(
+      "Code Mark: No highlight was found at the cursor. Move onto a highlighted section or use the sidebar to choose a match."
+    );
     return;
   }
 

@@ -30,7 +30,9 @@ function resolveHighlightsInEditor(
       editor.document,
       h.codeSnippet,
       h.codeHash,
-      fuzzyThreshold
+      fuzzyThreshold,
+      h.contextBefore,
+      h.contextAfter
     );
     if (range) {
       resolved.push({ highlight: h, range });
@@ -64,7 +66,13 @@ export async function nextHighlight(
   }
 
   const resolved = resolveHighlightsInEditor(editor, fileHighlights, getFuzzyThreshold());
-  if (resolved.length === 0) { return; }
+  if (resolved.length === 0) {
+    vscode.window.setStatusBarMessage(
+      "$(warning) Code Mark: No matches could be resolved in this file. The code may have changed significantly.",
+      3500
+    );
+    return;
+  }
 
   const cursor = editor.selection.active;
 
@@ -97,7 +105,13 @@ export async function prevHighlight(
   }
 
   const resolved = resolveHighlightsInEditor(editor, fileHighlights, getFuzzyThreshold());
-  if (resolved.length === 0) { return; }
+  if (resolved.length === 0) {
+    vscode.window.setStatusBarMessage(
+      "$(warning) Code Mark: No matches could be resolved in this file. The code may have changed significantly.",
+      3500
+    );
+    return;
+  }
 
   const cursor = editor.selection.active;
 
@@ -117,7 +131,9 @@ export async function jumpToHighlight(
   filePath: string,
   snippet: string,
   codeHash: string,
-  fuzzyThreshold: number = 0.75
+  fuzzyThreshold: number = 0.75,
+  contextBefore: string = "",
+  contextAfter: string = ""
 ): Promise<void> {
   // Open the file
   const folders = vscode.workspace.workspaceFolders;
@@ -127,9 +143,18 @@ export async function jumpToHighlight(
   const doc = await vscode.workspace.openTextDocument(absPath);
   const editor = await vscode.window.showTextDocument(doc);
 
-  const range = findRangeInDocument(doc, snippet, codeHash, fuzzyThreshold);
+  const range = findRangeInDocument(
+    doc,
+    snippet,
+    codeHash,
+    fuzzyThreshold,
+    contextBefore,
+    contextAfter
+  );
   if (!range) {
-    vscode.window.showWarningMessage("Code Mark: Could not locate highlight in file (code may have changed significantly).");
+    vscode.window.showWarningMessage(
+      "Code Mark: Could not locate this highlight in the file. The code may have changed, been moved, or been edited significantly. The highlight remains saved for reference."
+    );
     return;
   }
 

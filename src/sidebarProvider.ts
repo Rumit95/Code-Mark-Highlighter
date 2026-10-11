@@ -55,13 +55,15 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
   private _setMessageListener(webview: vscode.Webview): void {
     webview.onDidReceiveMessage(
-      async (msg: { command: string; id?: string; filePath?: string; snippet?: string; hash?: string; backgroundVisible?: string; opacity?: string }) => {
+      async (msg: { command: string; id?: string; filePath?: string; snippet?: string; hash?: string; contextBefore?: string; contextAfter?: string; backgroundVisible?: string; opacity?: string }) => {
         switch (msg.command) {
           case "jumpTo":
             this._onAction("jumpTo", {
               filePath: msg.filePath,
               snippet: msg.snippet,
               hash: msg.hash,
+              contextBefore: msg.contextBefore,
+              contextAfter: msg.contextAfter,
             });
             break;
           case "delete":
@@ -79,6 +81,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
             break;
           case "toggleBackground":
             this._onAction("toggleBackground", {});
+            break;
+          case "openSettings":
+            void vscode.commands.executeCommand("codemark.openSidebarSettings");
             break;
           case "setBackgroundVisible":
             if (msg.id && msg.backgroundVisible !== undefined) {
@@ -161,7 +166,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
       font-weight: 700;
       font-size: 13px;
       letter-spacing: 0.5px;
-      flex: 1;
+      margin-right: auto;
     }
     .header-count {
       font-size: 11px;
@@ -184,6 +189,25 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     .header-toggle:hover, .header-toggle:focus-visible {
       border-color: var(--dm-accent);
       outline: none;
+    }
+    .header-settings {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      border: 1px solid var(--dm-border);
+      border-radius: 6px;
+      background: transparent;
+      color: var(--dm-fg);
+      font-size: 14px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .header-settings:hover, .header-settings:focus-visible {
+      border-color: var(--dm-accent);
+      outline: none;
+      background: var(--dm-hover);
     }
 
     /* ── Filter Bar ── */
@@ -395,6 +419,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     <span class="header-title">Code Mark</span>
     <button class="header-toggle" id="background-toggle" type="button" aria-pressed="true" title="Hide highlight backgrounds">BG On</button>
     <span class="header-count" id="count">0</span>
+    <button class="header-settings" id="settings-button" type="button" title="Code Mark settings" aria-label="Open Code Mark settings">⚙️</button>
   </div>
 
   <!-- Filter Bar -->
@@ -436,6 +461,7 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
     const filterTagEl = document.getElementById('filter-tag');
     const searchEl = document.getElementById('search');
     const backgroundToggleEl = document.getElementById('background-toggle');
+    const settingsButtonEl = document.getElementById('settings-button');
 
     // Notify extension we're ready
     vscode.postMessage({ command: 'ready' });
@@ -454,6 +480,9 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
     backgroundToggleEl.addEventListener('click', () => {
       vscode.postMessage({ command: 'toggleBackground' });
+    });
+    settingsButtonEl.addEventListener('click', () => {
+      vscode.postMessage({ command: 'openSettings' });
     });
 
     function updateBackgroundToggle(state) {
@@ -535,12 +564,12 @@ export class SidebarProvider implements vscode.WebviewViewProvider {
 
         card.addEventListener('click', (e) => {
           if (e.target.closest('.card-actions, .card-display-controls')) return;
-          vscode.postMessage({ command: 'jumpTo', filePath: h.filePath, snippet: h.codeSnippet, hash: h.codeHash });
+          vscode.postMessage({ command: 'jumpTo', filePath: h.filePath, snippet: h.codeSnippet, hash: h.codeHash, contextBefore: h.contextBefore, contextAfter: h.contextAfter });
         });
 
         card.querySelector('.btn-jump')?.addEventListener('click', (e) => {
           e.stopPropagation();
-          vscode.postMessage({ command: 'jumpTo', filePath: h.filePath, snippet: h.codeSnippet, hash: h.codeHash });
+          vscode.postMessage({ command: 'jumpTo', filePath: h.filePath, snippet: h.codeSnippet, hash: h.codeHash, contextBefore: h.contextBefore, contextAfter: h.contextAfter });
         });
         card.querySelector('.btn-tag')?.addEventListener('click', (e) => {
           e.stopPropagation();

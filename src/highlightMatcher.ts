@@ -21,12 +21,19 @@ export function findRangeInDocument(
   document: vscode.TextDocument,
   snippet: string,
   storedHash: string,
-  fuzzyThreshold: number = 0.75
+  fuzzyThreshold: number = 0.75,
+  contextBefore: string = "",
+  contextAfter: string = ""
 ): vscode.Range | null {
   const docText = document.getText();
 
   // --- 1. Exact match (fastest) ---
-  const exactIdx = docText.indexOf(snippet);
+  const exactIdx = findBestExactMatch(
+    docText,
+    snippet,
+    contextBefore,
+    contextAfter
+  );
   if (exactIdx !== -1) {
     const start = document.positionAt(exactIdx);
     const end = document.positionAt(exactIdx + snippet.length);
@@ -115,6 +122,70 @@ export function findRangeInDocument(
   }
 
   return null;
+}
+
+function findBestExactMatch(
+  documentText: string,
+  snippet: string,
+  contextBefore: string,
+  contextAfter: string
+): number {
+  let bestIndex = -1;
+  let bestScore = -1;
+  let searchFrom = 0;
+
+  while (searchFrom <= documentText.length - snippet.length) {
+    const index = documentText.indexOf(snippet, searchFrom);
+    if (index === -1) { break; }
+
+    if (!contextBefore && !contextAfter) { return index; }
+
+    const before = documentText.slice(
+      Math.max(0, index - contextBefore.length),
+      index
+    );
+    const afterStart = index + snippet.length;
+    const after = documentText.slice(afterStart, afterStart + contextAfter.length);
+    const score = scoreContext(before, after, contextBefore, contextAfter);
+    if (score > bestScore) {
+      bestIndex = index;
+      bestScore = score;
+    }
+
+    searchFrom = index + 1;
+  }
+
+  return bestIndex;
+}
+
+function scoreContext(
+  actualBefore: string,
+  actualAfter: string,
+  expectedBefore: string,
+  expectedAfter: string
+): number {
+  let total = 0;
+  let count = 0;
+
+  if (expectedBefore) {
+    total += contextSimilarity(actualBefore, expectedBefore);
+    count++;
+  }
+  if (expectedAfter) {
+    total += contextSimilarity(actualAfter, expectedAfter);
+    count++;
+  }
+
+  return count === 0 ? 0 : total / count;
+}
+
+function contextSimilarity(actual: string, expected: string): number {
+  const normalizedActual = normalizeWhitespace(actual);
+  const normalizedExpected = normalizeWhitespace(expected);
+  if (normalizedActual.length < 3 || normalizedExpected.length < 3) {
+    return normalizedActual === normalizedExpected ? 1 : 0;
+  }
+  return similarity(normalizedActual, normalizedExpected);
 }
 
 /**

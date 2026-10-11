@@ -1,6 +1,6 @@
 # Code Mark Highlighter
 
-> Code Mark Highlighter helps developers mark important code with color, labels, and quick navigation inside VS Code. Highlights are stored by code content rather than line numbers, so they remain stable even after edits, rearrangement, or reopening files. Use the sidebar to filter, jump, edit tags, change colors, adjust opacity, and toggle highlight backgrounds.
+> Code Mark Highlighter helps developers mark important code with color, labels, and quick navigation inside VS Code. Highlights are stored by code content rather than line numbers, so they remain stable even after edits, rearrangement, or reopening files. Use the sidebar to filter, jump, edit tags, change colors, adjust opacity, and toggle highlight backgrounds. Compatible with VS Code on macOS, Windows, and Linux.
 
 ---
 
@@ -11,8 +11,14 @@ Select any code block → right-click → **Code Mark: Highlight Code** → choo
 Highlights appear with a colored background and a matching marker on the **overview ruler** (scrollbar).
 Set `codemark.highlightOpacity` to adjust background opacity, or enter a custom `#RRGGBBAA` color to include an alpha value.
 
+### 🔁 Duplicate Detection
+If the selected code already looks like a highlight in the current file, Code Mark shows a non-blocking warning instead of stopping the action. This lets the user continue highlighting while still being notified that the content may already exist.
+
+### 🧭 Better Match Status
+When a highlight cannot be resolved because the code has moved or changed significantly, the extension now gives clearer status messages instead of failing silently. This helps users understand whether the code changed, the match is missing, or a highlight simply needs review.
+
 ### 📌 Content-Based Persistence
-Highlights are stored by **code content** (SHA-256 hash + fuzzy text matching), not by line number.  
+Highlights are stored by **code content** (SHA-256 hash + fuzzy text matching), not by line number. New highlights also save nearby text as context anchors, helping distinguish identical code snippets in the same file.  
 If you insert/delete lines above a highlighted block, the highlight follows the code automatically.
 
 ### 🏷️ Tagging System
@@ -29,13 +35,17 @@ Open the **Code Mark** panel in the Activity Bar to see all highlights across yo
 - Color-coded cards with file name and code preview
 
 ### ⌨️ Keyboard Navigation
-| Shortcut | Action |
-|---|---|
-| `Ctrl+Alt+H` | Highlight selected code |
-| `Ctrl+Alt+R` | Remove highlight at cursor |
-| `Ctrl+Alt+B` | Toggle highlight backgrounds (saved highlights and ruler markers remain) |
-| `Ctrl+Alt+N` | Jump to next highlight in file |
-| `Ctrl+Alt+P` | Jump to previous highlight in file |
+The extension ships with defaults below, and you can customize any of them in VS Code’s Keyboard Shortcuts editor by searching for “Code Mark”.
+
+| Shortcut (Windows/Linux) | Shortcut (macOS) | Action |
+|---|---|---|
+| `Ctrl+Alt+H` | `Cmd+Alt+H` | Highlight selected code |
+| `Ctrl+Alt+R` | `Cmd+Alt+R` | Remove highlight at cursor |
+| `Ctrl+Alt+B` | `Cmd+Alt+B` | Toggle highlight backgrounds (saved highlights and ruler markers remain) |
+| `Ctrl+Alt+N` | `Cmd+Alt+N` | Jump to next highlight in file |
+| `Ctrl+Alt+P` | `Cmd+Alt+P` | Jump to previous highlight in file |
+
+> Use the gear button in the sidebar header for quick access to settings. It opens a menu with: (1) **Adjust fuzzy match threshold** and (2) **Open keyboard shortcuts**. You can also go directly to VS Code Settings → Keyboard Shortcuts, search `Code Mark`, and assign whichever keys fit your workflow.
 
 ---
 
@@ -82,8 +92,9 @@ Each entry:
 | Setting | Default | Description |
 |---|---|---|
 | `codemark.storageFile` | `.vscode/codemark.json` | Path (relative to workspace root) for the storage file |
-| `codemark.fuzzyMatchThreshold` | `0.75` | Similarity threshold (0.5–1.0) for fuzzy content matching |
+| `codemark.fuzzyMatchThreshold` | `0.75` | Similarity threshold (0.5–1.0) for fuzzy content matching; quick-edit from the sidebar gear menu |
 | `codemark.highlightOpacity` | `0.28` | Highlight background opacity (0–1); multiplies any alpha in `#RRGGBBAA` colors |
+| `codemark.duplicateHighlightWarning` | `true` | Shows a non-blocking warning when a selection appears to already be highlighted in the current file |
 
 Each highlight can also override the default opacity and background visibility independently from its sidebar card.
 
